@@ -4,7 +4,7 @@ import type { PortfolioUserOpenOrder } from '@/app/[locale]/(platform)/portfolio
 import type { SafeTransactionRequestPayload } from '@/lib/safe/transactions'
 import type { Event, Market, Outcome, UserPosition } from '@/types'
 import { useAppKitAccount } from '@reown/appkit/react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useExtracted, useLocale } from 'next-intl'
 import Form from 'next/form'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -53,7 +53,7 @@ import {
   calculateMarketFill,
   normalizeBookLevels,
 } from '@/lib/order-panel-utils'
-import { buildOrderPayload, calculateOrderAmounts, submitOrder } from '@/lib/orders'
+import { buildOrderPayload, submitOrder } from '@/lib/orders'
 import { signOrderPayload } from '@/lib/orders/signing'
 import { MIN_LIMIT_ORDER_SHARES, validateOrder } from '@/lib/orders/validation'
 import {
@@ -132,38 +132,6 @@ function resolveEndOfDayTimestamp() {
   const now = new Date(Date.now())
   now.setHours(23, 59, 59, 0)
   return Math.floor(now.getTime() / 1000)
-}
-
-interface FinalFeeEstimateResponse {
-  conditionId: string
-  platformMakerFeeAmount: string
-  platformTakerFeeAmount: string
-  builderMakerFeeAmount: string
-  builderTakerFeeAmount: string
-  totalMakerFeeAmount: string
-  totalTakerFeeAmount: string
-}
-
-interface FeePreviewDisplay {
-  platformMakerFee: number
-  platformTakerFee: number
-  builderMakerFee: number
-  builderTakerFee: number
-  totalMakerFee: number
-  totalTakerFee: number
-}
-
-function parseUsdcBaseUnits(value: string | null | undefined): number {
-  if (!value) {
-    return 0
-  }
-
-  try {
-    return Number(BigInt(value)) / 1_000_000
-  }
-  catch {
-    return 0
-  }
 }
 
 function useUserSharesStoreSync({
@@ -1051,86 +1019,6 @@ export default function EventOrderPanelForm({
     ? sellOrderSnapshot.priceCents
     : null
   const sellAmountLabel = formatCurrency(sellAmountValue)
-  const feePreviewMarketPriceCents = state.side === ORDER_SIDE.SELL
-    ? (marketSellFill?.limitPriceCents ?? sellOrderSnapshot.priceCents)
-    : (marketBuyFill?.limitPriceCents ?? currentBuyPriceCents ?? outcomeFallbackBuyPriceCents)
-
-  const feePreviewOrderAmounts = useMemo(() => {
-    if (!activeMarket?.condition_id || !activeOutcome) {
-      return null
-    }
-
-    const safeAmount = state.amount?.trim().length ? state.amount : '0'
-    const safeLimitPrice = state.limitPrice?.trim().length ? state.limitPrice : '0'
-    const safeLimitShares = state.limitShares?.trim().length ? state.limitShares : '0'
-
-    return calculateOrderAmounts({
-      orderType: state.type,
-      side: state.side,
-      amount: safeAmount,
-      limitPrice: safeLimitPrice,
-      limitShares: safeLimitShares,
-      marketPriceCents: feePreviewMarketPriceCents ?? undefined,
-    })
-  }, [
-    activeMarket?.condition_id,
-    activeOutcome,
-    feePreviewMarketPriceCents,
-    state.amount,
-    state.limitPrice,
-    state.limitShares,
-    state.side,
-    state.type,
-  ])
-
-  const feePreviewQuery = useQuery({
-    queryKey: [
-      'order-fee-preview',
-      activeMarket?.condition_id ?? '',
-      state.side,
-      state.type,
-      feePreviewOrderAmounts?.makerAmount.toString() ?? '0',
-      feePreviewOrderAmounts?.takerAmount.toString() ?? '0',
-      builderCode,
-    ],
-    enabled: Boolean(
-      activeMarket?.condition_id
-      && activeOutcome
-      && feePreviewOrderAmounts
-      && (feePreviewOrderAmounts.makerAmount > 0n || feePreviewOrderAmounts.takerAmount > 0n),
-    ),
-    staleTime: 5_000,
-    queryFn: async () => {
-      const side = state.side === ORDER_SIDE.BUY ? 'BUY' : 'SELL'
-      const params = new URLSearchParams({
-        conditionId: activeMarket!.condition_id,
-        side,
-        makerAmount: feePreviewOrderAmounts!.makerAmount.toString(),
-        takerAmount: feePreviewOrderAmounts!.takerAmount.toString(),
-        builderCode,
-      })
-      const response = await fetch(`/api/trading/final-fee?${params.toString()}`)
-      if (!response.ok) {
-        throw new Error('Failed to load fee preview.')
-      }
-      return response.json() as Promise<FinalFeeEstimateResponse>
-    },
-  })
-
-  const feePreview = useMemo<FeePreviewDisplay | null>(() => {
-    if (!feePreviewQuery.data) {
-      return null
-    }
-
-    return {
-      platformMakerFee: parseUsdcBaseUnits(feePreviewQuery.data.platformMakerFeeAmount),
-      platformTakerFee: parseUsdcBaseUnits(feePreviewQuery.data.platformTakerFeeAmount),
-      builderMakerFee: parseUsdcBaseUnits(feePreviewQuery.data.builderMakerFeeAmount),
-      builderTakerFee: parseUsdcBaseUnits(feePreviewQuery.data.builderTakerFeeAmount),
-      totalMakerFee: parseUsdcBaseUnits(feePreviewQuery.data.totalMakerFeeAmount),
-      totalTakerFee: parseUsdcBaseUnits(feePreviewQuery.data.totalTakerFeeAmount),
-    }
-  }, [feePreviewQuery.data])
 
   const filledSharesForCurrentSide = state.side === ORDER_SIDE.BUY
     ? (marketBuyFill?.filledShares ?? 0)
@@ -1936,8 +1824,6 @@ export default function EventOrderPanelForm({
                 showInsufficientSharesWarning={showInsufficientSharesWarning}
                 showInsufficientBalanceWarning={showInsufficientBalanceWarning}
                 showAmountTooLowWarning={showAmountTooLowWarning}
-                feePreview={feePreview}
-                isFeePreviewLoading={feePreviewQuery.isFetching}
                 limitPrice={state.limitPrice}
                 limitShares={state.limitShares}
                 limitExpirationEnabled={state.limitExpirationEnabled}

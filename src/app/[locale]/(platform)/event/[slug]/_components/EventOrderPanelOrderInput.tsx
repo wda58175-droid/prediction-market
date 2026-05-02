@@ -13,7 +13,6 @@ import EventOrderPanelLimitControls from '@/app/[locale]/(platform)/event/[slug]
 import EventOrderPanelSubmitButton from '@/app/[locale]/(platform)/event/[slug]/_components/EventOrderPanelSubmitButton'
 import EventOrderPanelUserShares from '@/app/[locale]/(platform)/event/[slug]/_components/EventOrderPanelUserShares'
 import { ORDER_SIDE } from '@/lib/constants'
-import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 
 interface EventOrderPanelOrderInputProps {
@@ -50,15 +49,6 @@ interface EventOrderPanelOrderInputProps {
   showInsufficientSharesWarning: boolean
   showInsufficientBalanceWarning: boolean
   showAmountTooLowWarning: boolean
-  feePreview: {
-    platformMakerFee: number
-    platformTakerFee: number
-    builderMakerFee: number
-    builderTakerFee: number
-    totalMakerFee: number
-    totalTakerFee: number
-  } | null
-  isFeePreviewLoading: boolean
   limitPrice: string
   limitShares: string
   limitExpirationEnabled: boolean
@@ -112,8 +102,6 @@ export default function EventOrderPanelOrderInput({
   showInsufficientSharesWarning,
   showInsufficientBalanceWarning,
   showAmountTooLowWarning,
-  feePreview,
-  isFeePreviewLoading,
   limitPrice,
   limitShares,
   limitExpirationEnabled,
@@ -257,52 +245,6 @@ export default function EventOrderPanelOrderInput({
             : showInsufficientBalanceWarning
               ? t('Insufficient USDC balance')
               : t('Insufficient shares for this order')}
-        </div>
-      )}
-
-      {(feePreview || isFeePreviewLoading) && (
-        <div className="mt-2 mb-3 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">{t('Estimated fees before signing')}</p>
-          {feePreview
-            ? (
-                <>
-                  <p>
-                    {t('Taker')}
-                    :
-                    {' '}
-                    {formatCurrency(feePreview.totalTakerFee)}
-                    {' '}
-                    (
-                    {t('Platform')}
-                    {' '}
-                    {formatCurrency(feePreview.platformTakerFee)}
-                    {' + '}
-                    {t('Builder')}
-                    {' '}
-                    {formatCurrency(feePreview.builderTakerFee)}
-                    )
-                  </p>
-                  <p>
-                    {t('Maker')}
-                    :
-                    {' '}
-                    {formatCurrency(feePreview.totalMakerFee)}
-                    {' '}
-                    (
-                    {t('Platform')}
-                    {' '}
-                    {formatCurrency(feePreview.platformMakerFee)}
-                    {' + '}
-                    {t('Builder')}
-                    {' '}
-                    {formatCurrency(feePreview.builderMakerFee)}
-                    )
-                  </p>
-                </>
-              )
-            : (
-                <p>{t('Calculating fees...')}</p>
-              )}
         </div>
       )}
 
